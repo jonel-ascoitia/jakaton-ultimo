@@ -1,0 +1,6 @@
+{
+  "name": "Dashboard Unificado de Redes Sociales",
+  "description": "Dashboard para monitoreo automatizado de métricas de YouTube, snapshots históricos y cálculo de engagement y tasas de crecimiento.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
