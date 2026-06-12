@@ -1744,16 +1744,20 @@ app.delete("/api/channels/:id", (req, res) => {
 
 // Bootstrapping development and production environments
 async function startServer() {
-  // If we are in development mode, load Vite as middleware
-  if (process.env.NODE_ENV !== "production") {
+  const distPath = path.join(process.cwd(), "dist");
+  const isProduction = process.env.NODE_ENV === "production" || 
+    (await import("fs")).default.existsSync(path.join(distPath, "index.html"));
+
+  if (!isProduction) {
+    // Development: load Vite as middleware
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    // Serve production built files
-    const distPath = path.join(process.cwd(), "dist");
+    // Production: serve pre-built static files
+    const { default: fs } = await import("fs");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
