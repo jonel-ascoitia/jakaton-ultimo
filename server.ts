@@ -1744,9 +1744,10 @@ app.delete("/api/channels/:id", (req, res) => {
 
 // Bootstrapping development and production environments
 async function startServer() {
-  const distPath = path.join(process.cwd(), "dist");
-  const isProduction = process.env.NODE_ENV === "production" || 
-    (await import("fs")).default.existsSync(path.join(distPath, "index.html"));
+  const { default: fs } = await import("fs");
+  const distPath = path.resolve(process.cwd(), "dist");
+  const distIndex = path.resolve(distPath, "index.html");
+  const isProduction = process.env.NODE_ENV === "production" || fs.existsSync(distIndex);
 
   if (!isProduction) {
     // Development: load Vite as middleware
@@ -1756,11 +1757,12 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Production: serve pre-built static files
-    const { default: fs } = await import("fs");
-    app.use(express.static(distPath));
+    // Production: serve Vite-compiled files from dist/
+    console.log(`Serving static files from: ${distPath}`);
+    app.use(express.static(distPath, { index: false }));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      if (req.path.startsWith("/api")) return res.status(404).json({ error: "Not found" });
+      res.sendFile(distIndex);
     });
   }
 
