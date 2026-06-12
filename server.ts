@@ -1762,7 +1762,7 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`RPSoft Bootcamp Hackathon Server running on http://localhost:${PORT}`);
-    console.log(`Using Database file: ${DB_FILE}`);
+    console.log(`Using Supabase PostgreSQL Cloud Database`);
   });
 }
 
