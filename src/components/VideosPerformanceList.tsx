@@ -12,7 +12,7 @@ export default function VideosPerformanceList({ channels, videos }: VideosPerfor
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [formatFilter, setFormatFilter] = useState<string>("all"); // all, short, long
   const [channelFilter, setChannelFilter] = useState<string>("all"); // all, channelId
-  const [sortBy, setSortBy] = useState<string>("velocity"); // date, views, interactions, engagement, velocity
+  const [sortBy, setSortBy] = useState<string>("date"); // date, views, interactions, engagement, velocity
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Reset page to 1 when filters change
