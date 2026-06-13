@@ -70,12 +70,82 @@ app.get("/api/dashboard-state", (req, res) => {
 
 // 2. Clear history and reset to original backup
 app.post("/api/reset-db", (req, res) => {
-  const originalBackupPath = path.join(process.cwd(), "data", "db.json");
-  // If it exists, we reload it. If it doesn't, we can rewrite standard.
   const db = readDb();
-  // We can just keep the channels, configs, but keep snapshots as loaded from our original setup.
-  // Original setup has 10 days of snapshots. Let's send a successful reset message.
   res.json({ success: true, message: "Base de datos recargada con éxito.", db });
+});
+
+// 3. AI Predictions endpoint
+app.post("/api/ai-predictions", async (req, res) => {
+  try {
+    const db = readDb();
+    const apiKey = req.body.geminiApiKey || db.config.geminiApiKey || process.env.GEMINI_API_KEY || "";
+    if (!apiKey) return res.status(400).json({ success: false, error: "Gemini API Key no configurada." });
+
+    const predictions = [];
+
+    for (const channel of db.channels) {
+      const channelSnaps = db.snapshots
+        .filter((s: any) => s.channelId === channel.id)
+        .sort((a: any, b: any) => a.date.localeCompare(b.date));
+
+      if (channelSnaps.length < 2) {
+        predictions.push({
+          channelId: channel.id,
+          channelName: channel.customName || channel.title,
+          currentSubs: channelSnaps[0]?.subscribers ?? 0,
+          dailyGrowthRate: 0,
+          weeklyGrowthRate: 0,
+          trend: "stable",
+          aiSummary: "No hay suficiente historial para generar predicciones confiables.",
+          confidence: "Baja"
+        });
+        continue;
+      }
+
+      const latest = channelSnaps.at(-1);
+      const oldest = channelSnaps[0];
+      const daysDiff = Math.max(1, (new Date(latest.date).getTime() - new Date(oldest.date).getTime()) / (1000 * 86400));
+      const totalGrowth = latest.subscribers - oldest.subscribers;
+      const dailyRate = totalGrowth / daysDiff;
+      const weeklyRate = dailyRate * 7;
+      const trend = dailyRate > 5 ? "up" : dailyRate < -5 ? "down" : "stable";
+
+      // Ask Gemini for a summary
+      const genai = new GoogleGenAI({ apiKey });
+      const historyText = channelSnaps.slice(-10).map((s: any) =>
+        `${s.date}: ${s.subscribers} subs, ${s.totalViews} vistas`
+      ).join("\n");
+
+      let aiSummary = "";
+      try {
+        const prompt = `Eres un analista experto en redes sociales. Analiza este historial de crecimiento del canal "${channel.customName || channel.title}" y da un resumen predictivo de máximo 2 oraciones en español, mencionando velocidad de crecimiento y qué esperar en los próximos 30 días:\n\n${historyText}\n\nTasa diaria actual: ${dailyRate.toFixed(1)} subs/día. Responde SOLO con el resumen, sin intro ni formateo.`;
+        const geminiRes = await genai.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: [{ role: "user", parts: [{ text: prompt }] }]
+        });
+        aiSummary = geminiRes.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "Análisis no disponible.";
+      } catch {
+        aiSummary = `Crecimiento estimado de ${dailyRate.toFixed(0)} subs/día basado en ${channelSnaps.length} snapshots históricos.`;
+      }
+
+      const confidence = channelSnaps.length >= 7 ? "Alta" : channelSnaps.length >= 3 ? "Media" : "Baja";
+
+      predictions.push({
+        channelId: channel.id,
+        channelName: channel.customName || channel.title,
+        currentSubs: latest.subscribers,
+        dailyGrowthRate: Math.round(dailyRate * 10) / 10,
+        weeklyGrowthRate: Math.round(weeklyRate * 10) / 10,
+        trend,
+        aiSummary,
+        confidence
+      });
+    }
+
+    res.json({ success: true, predictions });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // 3. Save threshold & YouTube API Key & Gemini API Key Configuration

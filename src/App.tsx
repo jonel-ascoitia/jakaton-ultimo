@@ -13,6 +13,9 @@ import TimeSeriesChart from "./components/TimeSeriesChart";
 import VideosPerformanceList from "./components/VideosPerformanceList";
 import MultiNetworkCompare from "./components/MultiNetworkCompare";
 import BusinessFaq from "./components/BusinessFaq";
+import AIPredictions from "./components/AIPredictions";
+import MonthlyRanking from "./components/MonthlyRanking";
+import ExportButtons from "./components/ExportButtons";
 import { Globe, RefreshCw, ShieldAlert, BadgeCheck, AlertCircle, Award } from "lucide-react";
 
 export default function App() {
@@ -169,7 +172,7 @@ export default function App() {
                   Dashboard Unificado de Redes Sociales
                 </h1>
                 <span className="text-[10px] font-mono font-bold bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">
-                  v1.3 — YouTube + AI Motor (FB/IG/TK)
+                  v2.0 — YouTube + AI Motor + Predicciones
                 </span>
                 <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-650 px-2 py-0.5 rounded-full">
                   RPSoft Bootcamp
@@ -221,6 +224,11 @@ export default function App() {
             >
               <RefreshCw size={14} />
             </button>
+            <ExportButtons
+              channels={state.channels}
+              snapshots={state.snapshots}
+              videos={state.videos}
+            />
           </div>
         </header>
 
@@ -318,7 +326,20 @@ export default function App() {
               videos={filteredVideos}
             />
 
-            {/* 8. Professional business sustantation FAQ */}
+            {/* 8. Monthly Ranking */}
+            <MonthlyRanking
+              channels={filteredChannels}
+              snapshots={state.snapshots}
+            />
+
+            {/* 9. AI Predictions */}
+            <AIPredictions
+              channels={filteredChannels}
+              snapshots={state.snapshots}
+              geminiApiKey={state.config.geminiApiKey}
+            />
+
+            {/* 10. Professional business sustantation FAQ */}
             <BusinessFaq />
           </>
         )}
