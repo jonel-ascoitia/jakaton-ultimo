@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { loadFromSupabase, saveToSupabase } from "./src/dbClient";
+import { Resend } from "resend";
 
 // Load environment variables
 dotenv.config();
@@ -72,6 +73,85 @@ app.get("/api/dashboard-state", (req, res) => {
 app.post("/api/reset-db", (req, res) => {
   const db = readDb();
   res.json({ success: true, message: "Base de datos recargada con éxito.", db });
+});
+
+// 2b. Email Alerts endpoint
+app.post("/api/send-alerts", async (req, res) => {
+  try {
+    const resendKey = process.env.RESEND_API_KEY || "";
+    const alertEmail = process.env.ALERT_EMAIL || req.body.alertEmail || "";
+
+    if (!resendKey) return res.status(400).json({ success: false, error: "Resend API Key no configurada." });
+    if (!alertEmail) return res.status(400).json({ success: false, error: "Email de alerta no configurado." });
+
+    const db = readDb();
+    const now = new Date();
+    const alerts: string[] = [];
+
+    for (const channel of db.channels) {
+      const snaps = db.snapshots
+        .filter((s: any) => s.channelId === channel.id)
+        .sort((a: any, b: any) => b.date.localeCompare(a.date));
+
+      if (snaps.length < 2) continue;
+
+      const latest = snaps[0];
+      const prev = snaps[1];
+      const subGrowth = latest.subscribers - prev.subscribers;
+      const pct = prev.subscribers > 0 ? (subGrowth / prev.subscribers) * 100 : 0;
+
+      // 🚀 Viral: grew more than 5%
+      if (pct >= 5) {
+        alerts.push(`🚀 <strong>${channel.customName || channel.title}</strong> creció un <strong>+${pct.toFixed(1)}%</strong> (${subGrowth > 0 ? "+" : ""}${subGrowth.toLocaleString()} subs) desde el último registro.`);
+      }
+      // 📉 Drop: lost subscribers
+      if (subGrowth < -100) {
+        alerts.push(`📉 <strong>${channel.customName || channel.title}</strong> perdió <strong>${Math.abs(subGrowth).toLocaleString()} suscriptores</strong> desde el último registro.`);
+      }
+    }
+
+    // 🔥 Trending videos: >10k views and recent (last 48h)
+    const cutoff = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    const trendingVideos = db.videos.filter((v: any) => {
+      const pub = new Date(v.publishedAt);
+      return pub >= cutoff && v.views >= 10000;
+    });
+
+    for (const video of trendingVideos) {
+      const ch = db.channels.find((c: any) => c.id === video.channelId);
+      alerts.push(`🔥 Video viral detectado: <strong>"${video.title}"</strong> de <strong>${ch?.customName || ch?.title || video.channelId}</strong> tiene <strong>${video.views.toLocaleString()} vistas</strong> en menos de 48 horas.`);
+    }
+
+    if (alerts.length === 0) {
+      return res.json({ success: true, sent: false, message: "No se detectaron alertas importantes en este momento. Todo está estable." });
+    }
+
+    const resend = new Resend(resendKey);
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 20px; border-radius: 12px;">
+        <div style="background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 24px; border-radius: 10px; margin-bottom: 24px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 22px;">📡 Alertas del Dashboard</h1>
+          <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0; font-size: 13px;">Reporte automático · ${now.toLocaleString("es-ES")}</p>
+        </div>
+        <div style="background: white; border-radius: 10px; padding: 20px; border: 1px solid #e5e7eb;">
+          <h2 style="color: #374151; font-size: 16px; margin-bottom: 16px;">🔔 Se detectaron ${alerts.length} alerta(s):</h2>
+          ${alerts.map(a => `<div style="padding: 12px 16px; margin-bottom: 10px; background: #faf5ff; border-left: 4px solid #7c3aed; border-radius: 6px; font-size: 14px; color: #374151; line-height: 1.5;">${a}</div>`).join("")}
+        </div>
+        <p style="text-align: center; color: #9ca3af; font-size: 11px; margin-top: 16px;">Dashboard Unificado de Redes Sociales · RPSoft Bootcamp</p>
+      </div>
+    `;
+
+    await resend.emails.send({
+      from: "Dashboard RPSoft <onboarding@resend.dev>",
+      to: [alertEmail],
+      subject: `📡 ${alerts.length} Alerta(s) Detectada(s) en tu Dashboard`,
+      html: htmlBody
+    });
+
+    res.json({ success: true, sent: true, alertCount: alerts.length, message: `Se enviaron ${alerts.length} alerta(s) a ${alertEmail}.` });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // 3. AI Predictions endpoint

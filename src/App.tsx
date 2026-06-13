@@ -16,6 +16,7 @@ import BusinessFaq from "./components/BusinessFaq";
 import AIPredictions from "./components/AIPredictions";
 import MonthlyRanking from "./components/MonthlyRanking";
 import ExportButtons from "./components/ExportButtons";
+import AlertsPanel from "./components/AlertsPanel";
 import { Globe, RefreshCw, ShieldAlert, BadgeCheck, AlertCircle, Award } from "lucide-react";
 
 export default function App() {
@@ -339,7 +340,10 @@ export default function App() {
               geminiApiKey={state.config.geminiApiKey}
             />
 
-            {/* 10. Professional business sustantation FAQ */}
+            {/* 10. Alerts Panel */}
+            <AlertsPanel />
+
+            {/* 11. Professional business sustantation FAQ */}
             <BusinessFaq />
           </>
         )}
