@@ -65,16 +65,12 @@ export default function VideosPerformanceList({ channels, videos }: VideosPerfor
         let matchesSearch = true;
         
         if (queryParts.length > 0) {
+          // Exact phrase match: highest priority
           if (combinedText.includes(normalizedQuery)) {
             matchesSearch = true;
           } else {
-            const matchedImportant = importantQueryParts.filter((word) => combinedText.includes(word));
-            
-            if (importantQueryParts.length > 0) {
-              matchesSearch = matchedImportant.length >= Math.ceil(importantQueryParts.length * 0.5) || matchedImportant.length >= 1;
-            } else {
-              matchesSearch = queryParts.every((word) => combinedText.includes(word));
-            }
+            // All words must appear (strict AND search)
+            matchesSearch = queryParts.every((word) => combinedText.includes(word));
           }
         }
 
